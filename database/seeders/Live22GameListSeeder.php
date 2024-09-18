@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\GameList;
+use App\Models\Admin\GameList;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\File;
 
