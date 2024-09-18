@@ -1,0 +1,699 @@
+// to remove laravel log
+php -r "file_put_contents('/var/www/delight_shan_a/storage/logs/laravel.log', '');"
+// created dev branch for kzt
+
+tail -f /var/www/html/delight_shan_a/storage/logs/laravel.log
+
+crontab -e
+
+* * * * * cd /var/www/html/delight_shan_a && php artisan schedule:run >> /dev/null 2>&1
+
+
+php artisan make:migration add_agent_link_to_users_table --table=users
+
+sudo chown -R www-data:www-data /var/www/html/delight_shan_a/bootstrap/cache
+sudo chmod -R 775 /var/www/html/delight_shan_a/bootstrap/cache
+
+## GameLogin
+MD5 (FunctionName + RequestDateTime + OperatorId + SecretKey + PlayerId)
+## GetBalance
+MD5 (FunctionName + RequestDateTime + OperatorId + SecretKey + PlayerId)
+## Bet
+MD5 (FunctionName + BetId + RequestDateTime + OperatorId + SecretKey + PlayerId)
+## GameResult
+MD5 (FunctionName + ResultId + RequestDateTime + OperatorId + SecretKey + PlayerId)
+## RollBack
+MD5 (FunctionName + BetId + RequestDateTime + OperatorId + SecretKey + PlayerId)
+## CashBonu
+ (FunctionName + TranId + RequestDateTime + OperatorId + SecretKey + PlayerId)
+ -- get balance ok --
+ <?php
+
+namespace App\Http\Controllers\Api\Live22;
+
+use App\Enums\StatusCode;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\SlotWebhookRequest;
+use App\Services\SlotWebhookService;
+use App\Services\SlotWebhookValidator;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
+class GetBalanceController extends Controller
+{
+    public function getBalance(SlotWebhookRequest $request)
+    {
+        Log::info('GetBalance request initiated', ['request_data' => $request->all()]);
+
+        DB::beginTransaction();
+        try {
+            // Validate the request using the SlotWebhookValidator
+            Log::info('Starting validation process');
+            $validator = SlotWebhookValidator::make($request)->validate();
+
+            if ($validator->fails()) {
+                Log::warning('Validation failed', ['response' => $validator->getResponse()]);
+
+                return response()->json($validator->getResponse(), 200);
+            } else {
+                Log::info('Validation passed, no failure detected');
+            }
+
+            Log::info('Validation passed, preparing balance response');
+            $balance = $request->getMember()->wallet->balance;
+            $response = SlotWebhookService::buildResponse(
+                StatusCode::OK,
+                number_format($balance, 4, '.', ''),
+                number_format($balance, 4, '.', '')
+            );
+
+            //$balance,
+            //$balance);
+
+            //number_format($oldBalance, 4, '.', ''),
+            //number_format($newBalance, 4, '.', '')
+
+            Log::info('Returning response', ['response' => $response]);
+
+            DB::commit();
+
+            return response()->json($response);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('An error occurred during GetBalance', [
+                'exception' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+}
+
+
+--------------
+<?php
+
+namespace App\Http\Controllers\Api\Live22;
+
+use App\Models\User;
+use App\Enums\StatusCode;
+use App\Traits\UseWebhook;
+use Illuminate\Http\Request;
+use App\Enums\TransactionName;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use App\Http\Controllers\Controller;
+use App\Services\PlaceBetWebhookService;
+use App\Services\RollBackWebhookService;
+use App\Models\Admin\SeamlessTransaction;
+use App\Http\Requests\RollBackWebhookRequest;
+
+class RollBackController extends Controller
+{
+    use UseWebhook;
+
+    public function rollBack(RollBackWebhookRequest $request)
+    {
+        DB::beginTransaction();
+        try {
+            Log::info('Starting RollBack method');
+
+            // Validate Player
+            $player = $request->getMember();
+            if (! $player) {
+                Log::warning('Invalid player detected', [
+                    'PlayerId' => $request->getPlayerId(),
+                ]);
+
+                // Return Invalid Player response
+                return PlaceBetWebhookService::buildResponse(
+                    StatusCode::InvalidPlayerPassword,
+                    0, // Balance is 0 in case of invalid player
+                    0
+                );
+            }
+
+            $oldBalance = $player->wallet->balance;
+            Log::info('Retrieved member balance', ['old_balance' => $oldBalance]);
+
+            $validator = $request->check();
+            Log::info('Validator check passed');
+
+            if ($validator->fails()) {
+                Log::warning('Validation failed');
+
+                return RollBackWebhookService::buildResponse(
+                    StatusCode::InvalidSignature,
+                    0,
+                    0
+                );
+            }
+
+            // Check for Insufficient Balance
+            if ($request->getBetAmount() > $oldBalance) {
+                Log::warning('Insufficient balance detected', [
+                    'bet_amount' => $request->getBetAmount(),
+                    'balance' => $oldBalance,
+                ]);
+
+                // Return Insufficient Balance response
+                return RollBackWebhookService::buildResponse(
+                    StatusCode::InsufficientBalance,
+                    $oldBalance,
+                    $oldBalance
+                );
+            }
+
+            // Check for duplicate BetId
+            $existingTransaction = SeamlessTransaction::where('rollback_type', $request->getRollbackType())->first();
+            if ($existingTransaction) {
+                Log::warning('Duplicate Rollback BetId detected', ['rollback_type' => $request->getRollbackType()]);
+
+                // Return the duplicate bet response
+                return RollBackWebhookService::buildResponse(
+                    StatusCode::DuplicateTransaction,
+                    0,
+                    0,
+                );
+            }
+
+            // Process Transfer
+            $this->processTransfer(
+                $player,
+                User::adminUser(),
+                TransactionName::Rollback,
+                $request->getBetAmount(),
+                $request->getExchangeRate()
+            );
+
+            $newBalance = $player->wallet->refreshBalance()->balance;
+            SeamlessTransaction::create([
+                'user_id' => $request->getUserId(),
+                'game_type_id' => $request->getGameTypeID(),
+                'transaction_amount' => $request->getBetAmount(),
+                'valid_amount' => $request->getBetAmount(),
+                'operator_id' => $request->getOperatorCode(),
+                'request_date_time' => $request->getRequestTime(),
+                'signature' => $request->getSign(),
+                'player_id' => $request->getPlayerId(),
+                'currency' => $request->getCurrency(),
+                'round_id' => $request->getRoundId(),
+                'bet_id' => $request->getBetId(),
+                'bet_amount' => $request->getBetAmount(),
+                'exchange_rate' => $request->getExchangeRate(),
+                'game_code' => $request->getGameCode(),
+                'tran_date_time' => $request->getTranDateTime(),
+                'auth_token' => $request->getAuthToken(),
+                'provider_time_zone' => $request->getProviderTimeZone(),
+                'provider_tran_dt' => $request->getProviderTranDt(),
+                'old_balance' => $oldBalance,
+                'new_balance' => $newBalance,
+                'rollback_type' => $request->getRollbackType()
+            ]);
+
+            Log::info('Refreshed member balance', ['new_balance' => $newBalance]);
+
+            DB::commit();
+            Log::info('Transaction committed successfully');
+
+            return RollBackWebhookService::buildResponse(
+                StatusCode::OK,
+                number_format($oldBalance, 4, '.', ''),
+                number_format($newBalance + $request->getBetAmount(), 4, '.', '')
+            );
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Failed to place bet', [
+                'error' => $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile(),
+            ]);
+
+            return response()->json(['message' => 'Failed to Rollback'], 500);
+        }
+    }
+}
+
+---------------
+ <?php
+
+namespace App\Http\Controllers\Api\Live22;
+
+use App\Enums\StatusCode;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\SlotWebhookRequest;
+use App\Services\GameService;
+use App\Services\SlotWebhookService;
+use App\Services\SlotWebhookValidator;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
+class GetBalanceController extends Controller
+{
+    public function getBalance(SlotWebhookRequest $request)
+    {
+        Log::info('GetBalance request initiated', ['request_data' => $request->all()]);
+
+        DB::beginTransaction();
+        try {
+            // Validate the request using the SlotWebhookValidator
+            Log::info('Starting validation process');
+            $validator = SlotWebhookValidator::make($request)->validate();
+
+            Log::info('Validation passed, preparing balance response');
+            $balance = $request->getMember()->wallet->balance;
+            $response = SlotWebhookService::buildResponse(StatusCode::OK, $balance, $balance);
+
+            Log::info('Returning response', ['response' => $response]);
+
+            return response()->json($response);
+
+            DB::commit();
+
+            // Build and return the success response
+            Log::info('Returning successful response');
+
+            return SlotWebhookService::buildResponse(
+                StatusCode::OK,
+                $balance,
+                $balance
+            );
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('An error occurred during GetBalance', [
+                'exception' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            // Handle any unexpected exceptions and return an error message
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+}
+
+------------------------------------------------------------------------------------------
+<?php
+namespace App\Http\Controllers\Api\Live22;
+
+use App\Models\User;
+use App\Enums\StatusCode;
+use App\Traits\UseWebhook;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use App\Enums\TransactionName;
+use Illuminate\Support\Facades\DB;
+use App\Models\Admin\SeamlessEvent;
+use Illuminate\Support\Facades\Log;
+use App\Http\Controllers\Controller;
+use App\Services\PlaceBetWebhookService;
+use App\Models\Admin\SeamlessTransaction;
+use App\Http\Requests\PlaceBetWebhookRequest;
+
+class PlaceBetController extends Controller
+{
+    use UseWebhook;
+
+    public function placeBet(PlaceBetWebhookRequest $request)
+{
+    DB::beginTransaction();
+    try {
+        Log::info('Starting placeBet method');
+
+        $validator = $request->check();
+        Log::info('Validator check passed');
+
+        if ($validator->fails()) {
+            Log::warning('Validation failed');
+            return $validator->getResponse();
+        }
+
+         // Validate Player
+            $player = $request->getMember();
+            if (!$player) {
+                Log::warning('Invalid player detected', [
+                    'PlayerId' => $request->getPlayerId()
+                ]);
+
+                // Return Invalid Player response
+                return PlaceBetWebhookService::buildResponse(
+                    StatusCode::InvalidPlayer,
+                    0, // Balance is 0 in case of invalid player
+                    0
+                );
+            }
+
+        $oldBalance = $request->getMember()->wallet->balance;
+        //$newBalance = $request->getMember()->wallet->balance;
+        $newBalance = $request->getMember()->wallet->refreshBalance()->balance;
+
+          $oldBalance = $request->getMember()->wallet->balance;
+            Log::info('Retrieved member balance', ['old_balance' => $oldBalance]);
+         // Check for Insufficient Balance
+            if ($request->getBetAmount() > $oldBalance) {
+                Log::warning('Insufficient balance detected', [
+                    'bet_amount' => $request->getBetAmount(),
+                    'balance' => $oldBalance
+                ]);
+
+                // Return Insufficient Balance response
+                return PlaceBetWebhookService::buildResponse(
+                    StatusCode::InsufficientBalance,
+                    $oldBalance,
+                    $oldBalance
+                );
+            }
+
+            // Check for duplicate BetId
+            $existingTransaction = SeamlessTransaction::where('bet_id', $request->getBetId())->first();
+            if ($existingTransaction) {
+                Log::warning('Duplicate BetId detected', ['bet_id' => $request->getBetId()]);
+
+                // Return the duplicate bet response
+                return PlaceBetWebhookService::buildResponse(
+                    StatusCode::DuplicateTransaction,
+                    $oldBalance,
+                    $oldBalance - $request->getBetAmount()
+                );
+            }
+
+        //Log::info('Retrieved member balance', ['old_balance' => $oldBalance]);
+
+            $this->processTransfer(
+                $request->getMember(),
+                User::adminUser(),
+                TransactionName::Stake,
+                $request->getBetAmount(),
+                $request->getExchangeRate(),
+            );
+
+            SeamlessTransaction::create([
+            'user_id' => $request->getUserId(),
+            'game_type_id' => $request->getGameTypeID(),
+            'transaction_amount' => $request->getBetAmount(),
+            'valid_amount' => $request->getBetAmount(),
+            'operator_id' => $request->getOperatorCode(),
+            'request_date_time' => $request->getRequestTime(),
+            'signature' => $request->getSign(),
+            'player_id' => $request->getPlayerId(),
+            'currency' => $request->getCurrency(),
+            'round_id' => $request->getRoundId(),
+            'bet_id' => $request->getBetId(),
+            'bet_amount' => $request->getBetAmount(),
+            'exchange_rate' => $request->getExchangeRate(),
+            'game_code' => $request->getGameCode(),
+            'tran_date_time' => $request->getTranDateTime(),
+            'auth_token' => $request->getAuthToken(),
+            'provider_time_zone' => $request->getProviderTimeZone(),
+            'provider_tran_dt' => $request->getProviderTranDt(),
+            'old_balance' => $oldBalance,
+            'new_balance' => $newBalance,
+        ]);
+        Log::info('Refreshed member balance', ['new_balance' => $newBalance]);
+
+        DB::commit();
+        Log::info('Transaction committed successfully');
+
+        return PlaceBetWebhookService::buildResponse(
+            StatusCode::OK,
+            $oldBalance,
+            $newBalance
+        );
+    } catch (\Exception $e) {
+        DB::rollBack();
+        Log::error('Failed to place bet', [
+            'error' => $e->getMessage(),
+            'line' => $e->getLine(),
+            'file' => $e->getFile(),
+        ]);
+        return response()->json(['message' => 'Failed to place bet'], 500);
+    }
+}
+
+}
+
+--------------------
+<?php
+namespace App\Http\Controllers\Api\Live22;
+
+use App\Http\Requests\GameResultWebhookRequest;
+use App\Models\User;
+use App\Enums\StatusCode;
+use App\Services\GameResultWebhookService;
+use App\Services\GameResultWebhookValidator;
+use App\Traits\UseWebhook;
+use Illuminate\Http\Request;
+use App\Enums\TransactionName;
+use App\Models\Admin\GameResult;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use App\Http\Controllers\Controller;
+use App\Services\PlaceBetWebhookService;
+use App\Http\Requests\PlaceBetWebhookRequest;
+
+class GameResultController extends Controller
+{
+    use UseWebhook;
+
+    public function gameResult(GameResultWebhookRequest $request)
+    {
+        DB::beginTransaction();
+        try {
+            Log::info('Starting GameResult method');
+
+            // Validate Player
+            $player = $request->getMember();
+            if (!$player) {
+                Log::warning('Invalid player detected', [
+                    'PlayerId' => $request->getPlayerId()
+                ]);
+
+                // Return Invalid Player response
+                return GameResultWebhookService::buildResponse(
+                    StatusCode::InvalidPlayerPassword,
+                    0, // Balance is 0 in case of invalid player
+                    0
+                );
+            }
+
+            $oldBalance = $player->wallet->balance;
+            Log::info('Retrieved member balance', ['old_balance' => $oldBalance]);
+
+            $validator = $request->check();
+
+            if ($validator->fails()) {
+                    return $validator->getResponse();
+            }
+
+            // Check for duplicate ResultId
+            $existingTransaction = GameResult::where('result_id', $request->ResultID())->first();
+            if ($existingTransaction) {
+                Log::warning('Duplicate ResultID detected', ['result_id' => $request->ResultID()]);
+
+                // Return the duplicate result response
+                return GameResultWebhookService::buildResponse(
+                    StatusCode::DuplicateTransaction,
+                    $oldBalance,
+                    $oldBalance
+                );
+            }
+
+            // Process Transfer
+            $this->processTransfer(
+                $player,
+                User::adminUser(),
+                TransactionName::Stake,
+                $request->getBetAmount(),
+                $request->getExchangeRate()
+            );
+
+            $newBalance = $player->wallet->refreshBalance()->balance;
+            GameResult::create([
+                'user_id' => $request->getUserId(),
+                'operator_id' => $request->getOperatorCode(),
+                'request_date_time' => $request->getRequestTime(),
+                'signature' => $request->getSign(),
+                'player_id' => $request->getPlayerId(),
+                'currency' => $request->getCurrency(),
+                'result_id' => $request->ResultID(),
+                'bet_id' => $request->GetBetID(),
+                'round_id' => $request->getRoundId(),
+                'game_code' => $request->GetGameCode(),
+                'game_type' => $request->GetGameType(),
+                'game_name' => $request->input('GameName'), // Assuming it's coming in the request
+                'result_type' => $request->GetResultType(),
+                'bet_amount' => $request->getBetAmount(),
+                'valid_bet_amount' => $request->input('ValidBetAmount'), // Assuming it's coming in the request
+                'payout' => $request->getPayout(),
+                'win_lose' => $request->getWinLose(),
+                'exchange_rate' => $request->getExchangeRate(),
+                'tran_date_time' => $request->getTranDateTime(),
+                'provider_time_zone' => $request->getProviderTimeZone(),
+                'provider_tran_dt' => $request->getProviderTranDt(),
+                'round_type' => $request->getRoundType(),
+            ]);
+
+            Log::info('Refreshed member balance', ['new_balance' => $newBalance]);
+
+            DB::commit();
+            Log::info('Transaction committed successfully');
+
+            return GameResultWebhookService::buildResponse(
+                StatusCode::OK,
+                $oldBalance,
+                $newBalance
+            );
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Failed to game result', [
+                'error' => $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile(),
+            ]);
+            return response()->json(['message' => 'Failed to game result'], 500);
+        }
+    }
+}
+
+---------------------
+<?php
+
+namespace App\Http\Controllers\Api\Live22;
+
+use App\Enums\StatusCode;
+use App\Enums\TransactionName;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\GameResultWebhookRequest;
+use App\Http\Requests\PlaceBetWebhookRequest;
+use App\Models\Admin\GameResult;
+use App\Models\Admin\SeamlessTransaction;
+use App\Models\User;
+use App\Services\GameResultWebhookService;
+use App\Services\GameResultWebhookValidator;
+use App\Services\PlaceBetWebhookService;
+use App\Traits\UseWebhook;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
+class GameResultController extends Controller
+{
+    use UseWebhook;
+
+    public function gameResult(GameResultWebhookRequest $request)
+    {
+        DB::beginTransaction();
+        try {
+            Log::info('Starting GameResult method');
+
+            // Validate Player
+            $player = $request->getMember();
+            if (! $player) {
+                Log::warning('Invalid player detected', [
+                    'PlayerId' => $request->getPlayerId(),
+                ]);
+
+                return GameResultWebhookService::buildResponse(
+                    StatusCode::InvalidPlayerPassword,
+                    0,
+                    0
+                );
+            }
+
+            $oldBalance = $player->wallet->balance;
+            Log::info('Retrieved member balance', ['old_balance' => $oldBalance]);
+
+            $validator = $request->check();
+            if ($validator->fails()) {
+                return $validator->getResponse();
+            }
+
+            $existingTransaction = $request->transactionId();
+            if (! $existingTransaction) {
+                Log::warning('BetId not found in SeamlessTransaction', [
+                    'bet_id' => $request->transactionId(),
+                    'seamless_transactions_count' => SeamlessTransaction::count(),
+                    'seamless_transactions_last_entry' => SeamlessTransaction::orderBy('created_at', 'desc')->first(),
+                ]);
+
+                return GameResultWebhookService::buildResponse(
+                    StatusCode::BetTransactionNotFound,
+                    $oldBalance,
+                    $oldBalance
+                );
+            }
+
+            // Check for duplicate ResultId
+            $existingResult = GameResult::where('result_id', $request->getResultId())->first();
+            if ($existingResult) {
+                Log::warning('Duplicate ResultID detected', ['result_id' => $request->getResultId()]);
+
+                return GameResultWebhookService::buildResponse(
+                    StatusCode::DuplicateTransaction,
+                    $oldBalance,
+                    $oldBalance
+                );
+            }
+
+            // Process Transfer
+            $this->processTransfer(
+                $player,
+                User::adminUser(),
+                TransactionName::Stake,
+                $request->getBetAmount(),
+                $request->getExchangeRate()
+            );
+
+            $newBalance = $player->wallet->refreshBalance()->balance;
+            GameResult::create([
+                'user_id' => $request->getUserId(),
+                'operator_id' => $request->getOperatorCode(),
+                'request_date_time' => $request->getRequestTime(),
+                'signature' => $request->getSign(),
+                'player_id' => $request->getPlayerId(),
+                'currency' => $request->getCurrency(),
+                'result_id' => $request->getResultId(),
+                'bet_id' => $request->transactionId(),
+                'round_id' => $request->getRoundId(),
+                'game_code' => $request->GetGameCode(),
+                'game_type' => $request->GetGameType(),
+                'game_name' => $request->input('GameName'),
+                'result_type' => $request->GetResultType(),
+                'bet_amount' => $request->getBetAmount(),
+                'valid_bet_amount' => $request->input('ValidBetAmount'),
+                'payout' => $request->getPayout(),
+                'win_lose' => $request->getWinLose(),
+                'exchange_rate' => $request->getExchangeRate(),
+                'tran_date_time' => $request->getTranDateTime(),
+                'provider_time_zone' => $request->getProviderTimeZone(),
+                'provider_tran_dt' => $request->getProviderTranDt(),
+                'round_type' => $request->getRoundType(),
+            ]);
+
+            Log::info('Refreshed member balance', ['new_balance' => $newBalance]);
+
+            DB::commit();
+            Log::info('Transaction committed successfully');
+
+            return GameResultWebhookService::buildResponse(
+                StatusCode::OK,
+                $oldBalance,
+                $newBalance
+            );
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Failed to game result', [
+                'error' => $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile(),
+            ]);
+
+            return response()->json(['message' => 'Failed to game result'], 500);
+        }
+    }
+}
