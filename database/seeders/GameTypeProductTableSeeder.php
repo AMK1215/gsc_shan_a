@@ -3,7 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Admin\GameType;
-use App\Models\GameTypeProduct;
+use App\Models\Admin\GameTypeProduct;
 use Illuminate\Database\Seeder;
 
 class GameTypeProductTableSeeder extends Seeder
