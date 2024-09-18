@@ -5,7 +5,7 @@ namespace Database\Seeders;
 use App\Models\Admin\GameType;
 use Illuminate\Database\Seeder;
 
-class GameTypeTableSeeder extends Seeder
+class GameTypeSeeder extends Seeder
 {
     /**
      * Run the database seeds.
