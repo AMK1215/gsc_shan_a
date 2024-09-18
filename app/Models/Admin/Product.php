@@ -1,8 +1,7 @@
 <?php
 
-namespace App\Models;
+namespace App\Models\Admin;
 
-use App\Models\Admin\GameType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -17,7 +16,7 @@ class Product extends Model
 
     public function gameTypes()
     {
-        return $this->belongsToMany(GameType::class);
+        return $this->belongsToMany(GameType::class)->withPivot('image');
     }
 
     public function getImgUrlAttribute()
@@ -25,5 +24,6 @@ class Product extends Model
         if (isset($this->pivot) && isset($this->pivot->image)) {
             return asset('assets/img/game_logo/'.$this->pivot->image);
         }
+
     }
 }

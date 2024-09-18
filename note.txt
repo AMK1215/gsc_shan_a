@@ -1,18 +1,19 @@
 // to remove laravel log
-php -r "file_put_contents('/var/www/delight_shan_a/storage/logs/laravel.log', '');"
+php -r "file_put_contents('/var/www/html/gsc_shan_a/storage/logs/laravel.log', '');"
 // created dev branch for kzt
 
-tail -f /var/www/html/delight_shan_a/storage/logs/laravel.log
+tail -f /var/www/html/gsc_shan_a/storage/logs/laravel.log
 
 crontab -e
 
-* * * * * cd /var/www/html/delight_shan_a && php artisan schedule:run >> /dev/null 2>&1
+* * * * * cd /var/www/html/gsc_shan_a && php artisan schedule:run >> /dev/null 2>&1
 
+sudo systemctl reload nginx
 
 php artisan make:migration add_agent_link_to_users_table --table=users
 
-sudo chown -R www-data:www-data /var/www/html/delight_shan_a/bootstrap/cache
-sudo chmod -R 775 /var/www/html/delight_shan_a/bootstrap/cache
+sudo chown -R www-data:www-data /var/www/html/gsc_shan_a/bootstrap/cache
+sudo chmod -R 775 /var/www/html/gsc_shan_a/bootstrap/cache
 
 ## GameLogin
 MD5 (FunctionName + RequestDateTime + OperatorId + SecretKey + PlayerId)
