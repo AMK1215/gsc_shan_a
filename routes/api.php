@@ -34,20 +34,20 @@ Route::post('login', [AuthController::class, 'login']);
 // Route::post('GameResult', [GameResultController::class, 'gameResult']);
 // Route::post('Rollback', [RollBackController::class, 'rollBack']);
 // Route::post('CashBonus', [CashBonuController::class, 'cashBonu']);
-Route::get('GetGameList/{productId}/', [GameLoginController::class, 'getGameList']);
-Route::get('GetGameType', [GameLoginController::class, 'getGameType']);
-Route::get('gameProductType/{productId}', [GameLoginController::class, 'getProductType']);
-Route::get('GetGameList/{productId}/{gameTypeId}', [GameLoginController::class, 'getGameList']);
-Route::get('GetHasDemo', [GameLoginController::class, 'getHasDemo']);
-Route::post('transactions', [TransactionController::class, 'index'])->middleware('transaction');
+// Route::get('GetGameList/{productId}/', [GameLoginController::class, 'getGameList']);
+// Route::get('GetGameType', [GameLoginController::class, 'getGameType']);
+// Route::get('gameProductType/{productId}', [GameLoginController::class, 'getProductType']);
+// Route::get('GetGameList/{productId}/{gameTypeId}', [GameLoginController::class, 'getGameList']);
+// Route::get('GetHasDemo', [GameLoginController::class, 'getHasDemo']);
+// Route::post('transactions', [TransactionController::class, 'index'])->middleware('transaction');
 
-Route::get('LaunchGameDemo', [GameLoginController::class, 'launchGameDemoPlay']);
-Route::get('GameLists', [GetGameListController::class, 'getGames']);
-Route::get('DemoGameList', function (DemoGameListService $service) {
-    $lang = request()->get('lang', 'en-us'); // Default to 'en-us' if not specified
+// Route::get('LaunchGameDemo', [GameLoginController::class, 'launchGameDemoPlay']);
+// Route::get('GameLists', [GetGameListController::class, 'getGames']);
+// Route::get('DemoGameList', function (DemoGameListService $service) {
+//     $lang = request()->get('lang', 'en-us'); // Default to 'en-us' if not specified
 
-    return $service->getDemoGameList($lang);
-});
+//     return $service->getDemoGameList($lang);
+// });
 
 //Route::post('GameLogin', [GameLoginController::class, 'Gamelogin']);
 
@@ -85,9 +85,9 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('deposit-history', [TransferController::class, 'depositHistory']);
     Route::get('withdraw-history', [TransferController::class, 'withdrawHistory']);
     Route::get('promotion', [PromotionController::class, 'index']);
-    Route::group(['prefix' => 'live22sm'], function () {
-        Route::post('GameLogin', [GameLoginController::class, 'Gamelogin']);
-        Route::post('GetBalance', [GetBalanceController::class, 'getBalance']);
-    });
+    // Route::group(['prefix' => 'live22sm'], function () {
+    //     Route::post('GameLogin', [GameLoginController::class, 'Gamelogin']);
+    //     Route::post('GetBalance', [GetBalanceController::class, 'getBalance']);
+    // });
 
 });
