@@ -116,7 +116,7 @@ class SlotWebhookValidator
     public function getBeforeBalance()
     {
         if (! isset($this->before_balance)) {
-            $this->before_balance = $this->request->getMember()->balanceFloat;
+            $this->before_balance = $this->request->getMember()->wallet->balance;
         }
 
         return $this->before_balance;
