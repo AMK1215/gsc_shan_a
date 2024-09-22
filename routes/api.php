@@ -55,7 +55,7 @@ Route::post('login', [AuthController::class, 'login']);
     Route::group(['prefix' => 'Seamless'], function () {
     Route::post('GetBalance', [SamelessGetBalanceController::class, 'getBalance']);
 
-    // Route::group(["middleware" => ["webhook_log"]], function(){
+    Route::group(["middleware" => ["webhook_log"]], function(){
     Route::post('GetGameList', [LaunchGameController::class, 'getGameList']);
     Route::post('GameResult', [SamelessGameResultController::class, 'gameResult']);
     Route::post('Rollback', [RollbackController::class, 'rollback']);
@@ -67,7 +67,7 @@ Route::post('login', [AuthController::class, 'login']);
     Route::post('Bonus', [BonusController::class, 'bonus']);
     Route::post('Jackpot', [JackPotController::class, 'jackPot']);
     Route::post('MobileLogin', [MobileLoginController::class, 'MobileLogin']);
-    // });
+    });
 });
 
 // gsc end
