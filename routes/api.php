@@ -14,7 +14,7 @@ use App\Http\Controllers\Api\Live22\GameLoginController;
 use App\Http\Controllers\Api\V1\Webhook\BonusController;
 use App\Http\Controllers\Api\V1\Webhook\BuyInController;
 use App\Http\Controllers\Api\Live22\GameResultController;
-use App\Http\Controllers\Api\Live22\GetBalanceController;
+//use App\Http\Controllers\Api\Live22\GetBalanceController;
 use App\Http\Controllers\Api\V1\Webhook\BuyOutController;
 use App\Http\Controllers\Api\Live22\GetGameListController;
 use App\Http\Controllers\Api\V1\Game\LaunchGameController;
@@ -29,11 +29,11 @@ use App\Http\Controllers\Api\V1\Webhook\SamelessGetBalanceController;
 
 Route::post('login', [AuthController::class, 'login']);
 
-Route::post('GetBalance', [GetBalanceController::class, 'getBalance']);
-Route::post('Bet', [PlaceBetController::class, 'placeBet']);
-Route::post('GameResult', [GameResultController::class, 'gameResult']);
-Route::post('Rollback', [RollBackController::class, 'rollBack']);
-Route::post('CashBonus', [CashBonuController::class, 'cashBonu']);
+// Route::post('GetBalance', [GetBalanceController::class, 'getBalance']);
+// Route::post('Bet', [PlaceBetController::class, 'placeBet']);
+// Route::post('GameResult', [GameResultController::class, 'gameResult']);
+// Route::post('Rollback', [RollBackController::class, 'rollBack']);
+// Route::post('CashBonus', [CashBonuController::class, 'cashBonu']);
 Route::get('GetGameList/{productId}/', [GameLoginController::class, 'getGameList']);
 Route::get('GetGameType', [GameLoginController::class, 'getGameType']);
 Route::get('gameProductType/{productId}', [GameLoginController::class, 'getProductType']);
