@@ -134,7 +134,7 @@ class SlotWebhookValidator
 
     protected function getSecretKey()
     {
-        return config('gsc_game.api.secret_key');
+        return config('game.api.secret_key');
     }
 
     protected function response(SlotWebhookResponseCode $responseCode)
