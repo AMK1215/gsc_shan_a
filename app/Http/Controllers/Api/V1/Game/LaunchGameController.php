@@ -27,10 +27,10 @@ class LaunchGameController extends Controller
 
         // Retrieve user and configuration settings
         $user = Auth::user();
-        $operatorCode = Config::get('game.api.operator_code');
-        $secretKey = Config::get('game.api.secret_key');
-        $apiUrl = Config::get('game.api.url').'/Seamless/LaunchGame';
-        $password = Config::get('game.api.password');
+        $operatorCode = Config::get('gsc_game.api.operator_code');
+        $secretKey = Config::get('gsc_game.api.secret_key');
+        $apiUrl = Config::get('gsc_game.api.url').'/Seamless/LaunchGame';
+        $password = Config::get('gsc_game.api.password');
         // Generate the signature
         $requestTime = now()->format('YmdHis');
         $signature = md5($operatorCode.$requestTime.'launchgame'.$secretKey);
