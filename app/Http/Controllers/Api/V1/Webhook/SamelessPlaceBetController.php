@@ -29,8 +29,9 @@ class SamelessPlaceBetController extends Controller
             if ($validator->fails()) {
                 return $validator->getResponse();
             }
+            //$balance = round($request->getMember()->wallet->balance, 2);
 
-            $before_balance = $request->getMember()->wallet->balance;
+            $before_balance = round($request->getMember()->wallet->balance, 2);
 
             $event = $this->createEvent($request);
 
@@ -53,7 +54,7 @@ class SamelessPlaceBetController extends Controller
 
             $request->getMember()->wallet->refreshBalance();
 
-            $after_balance = $request->getMember()->wallet->balance;
+            $after_balance = round($request->getMember()->wallet->balance, 2);
 
             DB::commit();
 

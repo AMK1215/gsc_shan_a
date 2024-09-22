@@ -21,7 +21,9 @@ class SamelessGetBalanceController extends Controller
                 return $validator->getResponse();
             }
 
-            $balance = $request->getMember()->wallet->balance;
+            //$balance = $request->getMember()->wallet->balance;
+            $balance = round($request->getMember()->wallet->balance, 2);
+
 
             DB::commit();
 

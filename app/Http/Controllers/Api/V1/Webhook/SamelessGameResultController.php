@@ -34,7 +34,7 @@ class SamelessGameResultController extends Controller
                 return $validator->getResponse();
             }
 
-            $before_balance = $request->getMember()->wallet->balance;
+            $before_balance = round($request->getMember()->wallet->balance, 2);
 
             $event = $this->createEvent($request);
 
@@ -64,7 +64,7 @@ class SamelessGameResultController extends Controller
 
             $request->getMember()->wallet->refreshBalance();
 
-            $after_balance = $request->getMember()->wallet->balance;
+            $after_balance = round($request->getMember()->wallet->balance, 2);
 
             DB::commit();
 

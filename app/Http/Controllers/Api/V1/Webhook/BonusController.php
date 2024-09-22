@@ -53,7 +53,7 @@ class BonusController extends Controller
 
             $request->getMember()->wallet->refreshBalance();
 
-            $after_balance = $request->getMember()->wallet->balance;
+            $after_balance = round($request->getMember()->wallet->balance, 2);
 
             DB::commit();
 
