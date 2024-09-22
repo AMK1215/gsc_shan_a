@@ -34,7 +34,7 @@ class GameResultController extends Controller
                 return $validator->getResponse();
             }
 
-            $before_balance = $request->getMember()->balanceFloat;
+            $before_balance = $request->getMember()->wallet->balance;
 
             $event = $this->createEvent($request);
 
@@ -64,7 +64,7 @@ class GameResultController extends Controller
 
             $request->getMember()->wallet->refreshBalance();
 
-            $after_balance = $request->getMember()->balanceFloat;
+            $after_balance = $request->getMember()->wallet->balance;
 
             DB::commit();
 

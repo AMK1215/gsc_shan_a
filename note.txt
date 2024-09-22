@@ -15,6 +15,11 @@ php artisan make:migration add_agent_link_to_users_table --table=users
 sudo chown -R www-data:www-data /var/www/html/gsc_shan_a/bootstrap/cache
 sudo chmod -R 775 /var/www/html/gsc_shan_a/bootstrap/cache
 
+sudo chown -R www-data:www-data /var/www/gsc_shan_a/storage /var/www/gsc_shan_a/bootstrap/cache
+
+sudo chmod -R 775 /var/www/gsc_shan_a/storage /var/www/gsc_shan_a/bootstrap/cache
+
+
 ## GameLogin
 MD5 (FunctionName + RequestDateTime + OperatorId + SecretKey + PlayerId)
 ## GetBalance
