@@ -7,20 +7,22 @@ use App\Enums\TransactionName;
 use App\Http\Controllers\Api\V1\Webhook\Traits\UseWebhook;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Slot\SlotWebhookRequest;
-use App\Models\SeamlessEvent;
 use App\Models\Transaction;
 use App\Models\User;
-use App\Models\Wager;
 use App\Services\Slot\SlotWebhookService;
 use App\Services\Slot\SlotWebhookValidator;
 use App\Services\WalletService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
-class PlaceBetController extends Controller
+class SamelessRollbackController extends Controller
 {
     use UseWebhook;
 
-    public function placeBet(SlotWebhookRequest $request)
+    public function rollback(SlotWebhookRequest $request)
     {
         DB::beginTransaction();
         try {
@@ -34,13 +36,21 @@ class PlaceBetController extends Controller
 
             $event = $this->createEvent($request);
 
-            $seamless_transactions = $this->createWagerTransactions($validator->getRequestTransactions(), $event);
+            $seamless_transactions = $this->createWagerTransactions($validator->getRequestTransactions(), $event, true);
 
             foreach ($seamless_transactions as $seamless_transaction) {
+                if ($seamless_transaction->transaction_amount < 0) {
+                    $from = $request->getMember();
+                    $to = User::adminUser();
+                } else {
+                    $from = User::adminUser();
+                    $to = $request->getMember();
+                }
+
                 $this->processTransfer(
-                    $request->getMember(),
-                    User::adminUser(),
-                    TransactionName::Stake,
+                    $from,
+                    $to,
+                    TransactionName::Rollback,
                     $seamless_transaction->transaction_amount,
                     $seamless_transaction->rate,
                     [

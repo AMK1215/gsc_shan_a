@@ -14,13 +14,12 @@ use App\Services\Slot\SlotWebhookValidator;
 use App\Services\WalletService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
-class CancelBetController extends Controller
+class SamelessPushBetController extends Controller
 {
     use UseWebhook;
 
-    public function cancelBet(SlotWebhookRequest $request)
+    public function pushBet(SlotWebhookRequest $request)
     {
         DB::beginTransaction();
         try {
@@ -34,22 +33,7 @@ class CancelBetController extends Controller
 
             $event = $this->createEvent($request);
 
-            $seamless_transactions = $this->createWagerTransactions($validator->getRequestTransactions(), $event, true);
-
-            foreach ($seamless_transactions as $seamless_transaction) {
-                $this->processTransfer(
-                    User::adminUser(),
-                    $request->getMember(),
-                    TransactionName::Cancel,
-                    $seamless_transaction->transaction_amount,
-                    $seamless_transaction->rate,
-                    [
-                        'wager_id' => $seamless_transaction->wager_id,
-                        'event_id' => $request->getMessageID(),
-                        'seamless_transaction_id' => $seamless_transaction->id,
-                    ]
-                );
-            }
+            $this->createWagerTransactions($validator->getRequestTransactions(), $event);
 
             $request->getMember()->wallet->refreshBalance();
 

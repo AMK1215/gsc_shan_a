@@ -19,9 +19,13 @@ use App\Http\Controllers\Api\V1\Webhook\BuyOutController;
 use App\Http\Controllers\Api\Live22\GetGameListController;
 use App\Http\Controllers\Api\V1\Game\LaunchGameController;
 use App\Http\Controllers\Api\V1\Webhook\JackPotController;
-use App\Http\Controllers\Api\V1\Webhook\PushBetController;
-use App\Http\Controllers\Api\V1\Webhook\CancelBetController;
 use App\Http\Controllers\Api\V1\Webhook\MobileLoginController;
+use App\Http\Controllers\Api\V1\Webhook\SamelessPushBetController;
+use App\Http\Controllers\Api\V1\Webhook\SamelessPlaceBetController;
+use App\Http\Controllers\Api\V1\Webhook\SamelessCancelBetController;
+use App\Http\Controllers\Api\V1\Webhook\SamelessGameResultController;
+use App\Http\Controllers\Api\V1\Webhook\SamelessGetBalanceController;
+
 
 Route::post('login', [AuthController::class, 'login']);
 
@@ -49,17 +53,17 @@ Route::get('DemoGameList', function (DemoGameListService $service) {
 
 // gsc start
     Route::group(['prefix' => 'Seamless'], function () {
-    Route::post('GetBalance', [GetBalanceController::class, 'getBalance']);
+    Route::post('GetBalance', [SamelessGetBalanceController::class, 'getBalance']);
 
     // Route::group(["middleware" => ["webhook_log"]], function(){
     Route::post('GetGameList', [LaunchGameController::class, 'getGameList']);
-    Route::post('GameResult', [GameResultController::class, 'gameResult']);
+    Route::post('GameResult', [SamelessGameResultController::class, 'gameResult']);
     Route::post('Rollback', [RollbackController::class, 'rollback']);
-    Route::post('PlaceBet', [PlaceBetController::class, 'placeBet']);
-    Route::post('CancelBet', [CancelBetController::class, 'cancelBet']);
+    Route::post('PlaceBet', [SamelessPlaceBetController::class, 'placeBet']);
+    Route::post('CancelBet', [SamelessCancelBetController::class, 'cancelBet']);
     Route::post('BuyIn', [BuyInController::class, 'buyIn']);
     Route::post('BuyOut', [BuyOutController::class, 'buyOut']);
-    Route::post('PushBet', [PushBetController::class, 'pushBet']);
+    Route::post('PushBet', [SamelessPushBetController::class, 'pushBet']);
     Route::post('Bonus', [BonusController::class, 'bonus']);
     Route::post('Jackpot', [JackPotController::class, 'jackPot']);
     Route::post('MobileLogin', [MobileLoginController::class, 'MobileLogin']);

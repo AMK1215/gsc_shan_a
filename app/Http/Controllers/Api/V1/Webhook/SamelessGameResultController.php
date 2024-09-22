@@ -7,6 +7,7 @@ use App\Enums\TransactionName;
 use App\Http\Controllers\Api\V1\Webhook\Traits\UseWebhook;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Slot\SlotWebhookRequest;
+use App\Models\SeamlessEvent;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\Slot\SlotWebhookService;
@@ -17,12 +18,13 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Route;
 
-class RollbackController extends Controller
+class SamelessGameResultController extends Controller
 {
     use UseWebhook;
 
-    public function rollback(SlotWebhookRequest $request)
+    public function gameResult(SlotWebhookRequest $request)
     {
         DB::beginTransaction();
         try {
@@ -36,7 +38,7 @@ class RollbackController extends Controller
 
             $event = $this->createEvent($request);
 
-            $seamless_transactions = $this->createWagerTransactions($validator->getRequestTransactions(), $event, true);
+            $seamless_transactions = $this->createWagerTransactions($validator->getRequestTransactions(), $event);
 
             foreach ($seamless_transactions as $seamless_transaction) {
                 if ($seamless_transaction->transaction_amount < 0) {
@@ -46,11 +48,10 @@ class RollbackController extends Controller
                     $from = User::adminUser();
                     $to = $request->getMember();
                 }
-
                 $this->processTransfer(
                     $from,
                     $to,
-                    TransactionName::Rollback,
+                    TransactionName::Payout,
                     $seamless_transaction->transaction_amount,
                     $seamless_transaction->rate,
                     [

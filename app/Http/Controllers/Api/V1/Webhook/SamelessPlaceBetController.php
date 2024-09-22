@@ -10,21 +10,17 @@ use App\Http\Requests\Slot\SlotWebhookRequest;
 use App\Models\SeamlessEvent;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Models\Wager;
 use App\Services\Slot\SlotWebhookService;
 use App\Services\Slot\SlotWebhookValidator;
 use App\Services\WalletService;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Route;
 
-class GameResultController extends Controller
+class SamelessPlaceBetController extends Controller
 {
     use UseWebhook;
 
-    public function gameResult(SlotWebhookRequest $request)
+    public function placeBet(SlotWebhookRequest $request)
     {
         DB::beginTransaction();
         try {
@@ -41,17 +37,10 @@ class GameResultController extends Controller
             $seamless_transactions = $this->createWagerTransactions($validator->getRequestTransactions(), $event);
 
             foreach ($seamless_transactions as $seamless_transaction) {
-                if ($seamless_transaction->transaction_amount < 0) {
-                    $from = $request->getMember();
-                    $to = User::adminUser();
-                } else {
-                    $from = User::adminUser();
-                    $to = $request->getMember();
-                }
                 $this->processTransfer(
-                    $from,
-                    $to,
-                    TransactionName::Payout,
+                    $request->getMember(),
+                    User::adminUser(),
+                    TransactionName::Stake,
                     $seamless_transaction->transaction_amount,
                     $seamless_transaction->rate,
                     [
