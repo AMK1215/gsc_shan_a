@@ -29,7 +29,7 @@ class BonusController extends Controller
                 return $validator->getResponse();
             }
 
-            $before_balance = $request->getMember()->wallet->balance;
+            $before_balance = round($request->getMember()->wallet->balance, 2);
 
             $event = $this->createEvent($request);
 
